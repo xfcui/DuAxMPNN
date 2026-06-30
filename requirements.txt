@@ -5,3 +5,4 @@ numpy
 optax
 rdkit
 tqdm
+pytest

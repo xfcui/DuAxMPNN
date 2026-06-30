@@ -27,6 +27,9 @@ python -m src.dataset.dataprocess --h-mode active
 
 # Train DuAxMPNN and save the best validation checkpoint.
 python -m src.train --model_save_path results/best_model.eqx
+
+# Run unit tests.
+python -m pytest
 ```
 
 ## Data Layout
@@ -192,6 +195,8 @@ src/
   model.py          # DuAxMPNN architecture
   optim.py          # Adan optimizer and LR schedule
   train.py          # train/validate entry point
+tests/              # unit and integration tests
+  test_model.py
 requirements.txt
 ```
 
