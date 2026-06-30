@@ -7,10 +7,11 @@ benchmark. It predicts HOMO-LUMO gaps in eV and reports validation MAE.
 
 What DuAxMPNN includes:
 
-- `src.dataset.dataprocess`: raw SMILES plus optional SDF coordinates -> HDF5 graph tensors.
+- `src.dataset.dataprocess`: raw SMILES plus optional SDF coordinates → HDF5 graph tensors.
 - `src.dataset`: cached HDF5 dataset loading and padded collapsed graph batching.
-- `src.model`: the `DuAxMPNN` architecture with multi-hop edge mixing and dense depth mixing.
-- `src.train`: training loop, validation loop, Adan optimizer setup, and LR scheduling.
+- `src.model`: the fixed `DuAxMPNN` architecture with multi-hop edge mixing and dense depth mixing.
+- `src.optim`: Adan optimizer, per-parameter LR/WD multipliers, and geometric LR scheduling.
+- `src.train`: training loop, validation loop, and checkpoint saving.
 
 ## Quick Start
 
@@ -26,9 +27,6 @@ python -m src.dataset.dataprocess --h-mode active
 
 # Train DuAxMPNN and save the best validation checkpoint.
 python -m src.train --model_save_path results/best_model.eqx
-
-# Run smoke/regression tests.
-python -m pytest tst/ -q
 ```
 
 ## Data Layout
@@ -51,9 +49,9 @@ Preprocessing writes one processed HDF5 file. The dataset loader expects
 
 Hydrogen handling is controlled by `--h-mode`:
 
-- `active` -> `processed/data_processed.h5` (default)
-- `all` -> `processed/data_processed_all.h5`
-- `heavy` -> `processed/data_processed_heavy.h5`
+- `active` → `processed/data_processed.h5` (default)
+- `all` → `processed/data_processed_all.h5`
+- `heavy` → `processed/data_processed_heavy.h5`
 
 Use `--overwrite` when regenerating an existing processed file.
 
@@ -83,7 +81,7 @@ period, holds the peak learning rate for one period, then follows geometric
 cosine annealing. The best checkpoint by validation MAE is serialized with
 `eqx.tree_serialise_leaves`.
 
-Common training arguments:
+Training arguments:
 
 | Argument | Default | Description |
 |---|---:|---|
@@ -96,33 +94,26 @@ Common training arguments:
 | `--h-mode` | `active` | Chooses the processed HDF5 variant unless `--processed-h5` is set. |
 | `--processed-h5` | `None` | Explicit processed HDF5 basename under `processed/`. |
 
-Ablation flags are exposed directly from `AblationConfig`:
-
-```bash
-python -m src.train \
-  --max_hops 4 \
-  --depth_mode dense \
-  --cont_embed moact \
-  --moact_bases 8 \
-  --elec_mode absolute
-```
-
-Use `--no_neighbor_rank` to replace the direct-edge neighbor-rank feature with
-a neutral token.
+Architecture is fixed in `src.model` (no CLI toggles).
 
 ## Model
 
 `get_model()` creates `DuAxMPNN(depth=5, width=256, num_head=16, dim_head=16)`.
 The architecture mixes two information axes: bond-aware multi-hop message
-passing within each layer, and dense cross-depth aggregation across layers. The
-forward pass consumes batches produced by `PCQMDataloader`.
+passing within each layer, and dense cross-depth aggregation across layers.
+
+Fixed configuration:
+
+- `max_hops=4`, `depth_mode=dense`
+- MoAct electronic embedding (`K=8`), `elec_mode=absolute`
+- Neighbor rank always enabled on 1-hop edges
 
 Key components:
 
 - `EmbedLayer` embeds 10 discrete atom features with vocabulary offsets applied by the dataset.
 - `GatedLinearBlock` projects RWPE positional features and performs gated MLP-style mixing.
-- `LayerMixerKernel` combines 1-hop through `max_hops` bond-aware convolutions with virtual-node context.
-- `DepthMixerKernel` performs the dense depth-axis aggregation used by the default model.
+- `LayerMixerKernel` combines 1-hop through 4-hop bond-aware convolutions with virtual-node context.
+- `DepthMixerKernel` performs dense cross-depth aggregation.
 - `HeadKernel` sum-pools graph nodes, drops the null graph, and predicts one scalar gap per molecule.
 
 The training loss is MAE between predicted and target HOMO-LUMO gaps.
@@ -196,21 +187,12 @@ dtypes (`int32` and `float32`).
 
 ```text
 src/
-  dataset/
-    dataprocess.py  # SMILES/SDF preprocessing
-    dataset.py      # PCQMDataset and batch_collapse
-    dataloader.py   # PCQMDataloader
-    features.py     # atom/bond vocabulary and encoders
-    graph.py        # graph construction and feature engineering
-    hdf5.py         # compact HDF5 save/load helpers
-  dataset.py        # compatibility re-export for dataset APIs
+  dataset/          # preprocessing, loading, batching
+  dataset.py        # compatibility re-export
   model.py          # DuAxMPNN architecture
-  optim.py          # optimizer, LR schedule, per-parameter multipliers
+  optim.py          # Adan optimizer and LR schedule
   train.py          # train/validate entry point
-tst/                # dataset, model compatibility, and training utility tests
-prelims/            # feature engineering notes and analysis scripts
-results/            # checkpoints and experiment artifacts
+requirements.txt
 ```
 
-For feature engineering details, see [`prelims/design.md`](prelims/design.md)
-and the topic-specific notes under `prelims/`.
+For data pipeline details and feature category offsets, see [`src/dataset/README.md`](src/dataset/README.md).

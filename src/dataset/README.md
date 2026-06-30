@@ -11,6 +11,7 @@ The dataset is designed to efficiently load preprocessed molecular graphs from H
 - `PCQMDataset`: Handles loading from HDF5, managing splits, and "collapsing" multiple graphs into a single batched graph block.
 - `PCQMDataloader`: A simple iterator that yields batched graph blocks from a `PCQMDataset`.
 - `batch_collapse`: The core logic for merging multiple molecular graphs into one large graph with a prepended "null" graph for padding.
+- `dataprocess.py`, `features.py`, `graph.py`, `hdf5.py`: Preprocessing pipeline from raw SMILES/SDF to compact HDF5 tensors.
 
 ## Usage
 
