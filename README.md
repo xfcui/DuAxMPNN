@@ -1,6 +1,6 @@
 # DuAxMPNN
 
-DuAxMPNN is a JAX/Equinox/Optax toolkit for training a dual-axis
+[DuAxMPNN](https://link.springer.com/chapter/10.1007/978-981-92-3716-6_5) is a JAX/Equinox/Optax toolkit for training a dual-axis
 message-passing neural network on the
 [PCQM4Mv2](https://ogb.stanford.edu/docs/lsc/pcqm4mv2/) molecular graph
 benchmark. It predicts HOMO-LUMO gaps in eV and reports validation MAE.
